@@ -7,6 +7,17 @@ import yfinance as yf
 # SQLite db connection and table creation
 conn = sqlite3.connect("investing_app.db")
 
+# Function to create user
+def create_user(name):
+    cursor = conn.execute("SELECT id FROM users WHERE name = ?", (name,))
+    user_id = cursor.fetchone()
+    if not user_id:
+        conn.execute("INSERT INTO users (name) VALUES (?)", (name,))
+        conn.commit()
+        st.success(f"User {name} created successfully!")
+    else:
+        st.warning(f"User {name} already exists.")
+
 # Function to insert data into the investments table
 def insert_investment(user, ticker, amount, price, date):
     # Fetch user ID from the users table
@@ -31,6 +42,9 @@ st.markdown('<style>div.block-container{padding-top:2rem;}</style>', unsafe_allo
 
 name = st.text_input("Enter your name:")
 if name:
+    # Create user if not exists
+    st.session_state.user = name
+    create_user(name)
     st.write(f"Hello, {name}! Let's invest.")
 
     # Input form for investment details
