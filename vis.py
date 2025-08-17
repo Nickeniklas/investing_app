@@ -5,13 +5,18 @@ import pandas as pd
 import yfinance as yf
 
 # SQLite db connection and table creation
-conn = sqlite3.connect("investments.db")
-conn.execute("CREATE TABLE IF NOT EXISTS investments (id INTEGER PRIMARY KEY AUTOINCREMENT, user TEXT, ticker TEXT, amount INT, price REAL, date TEXT)")
+conn = sqlite3.connect("investing_app.db")
 
 # Function to insert data into the investments table
 def insert_investment(user, ticker, amount, price, date):
-    conn.execute("INSERT INTO investments (user, ticker, amount, price, date) VALUES (?, ?, ?, ?, ?)", (user, ticker, amount, price, date))
-    conn.commit()
+    # Fetch user ID from the users table
+    cursor = conn.execute("SELECT id FROM users WHERE name = ?", (user,))
+    user_id = cursor.fetchone()
+    if user_id:
+        conn.execute("INSERT INTO investments (user_id, ticker, amount, price, date) VALUES (?, ?, ?, ?, ?)", (user_id[0], ticker, amount, price, date))
+        conn.commit()
+    else:
+        st.error("User not found")
 
 # Function to fetch all investments
 def fetch_investments():
