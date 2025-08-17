@@ -1,15 +1,19 @@
 # Stock Investing Browser Application
 
-Pretend to invest in stocks and see how much you could profit!
+Invest in stocks with Real prices and see how much you could profit!
 
 **Streamlit, yfinance, SQLite**
 
-### Install required dependencies:
+### 1. Install required dependencies:
 ```
 pip install -r requirements.txt
 ```
+### 2. Initialize the Database
+```
+python init_db.py
+```
 
-### Launch Application in Browser:
+### 3. Launch Application in Browser:
 ```
 streamlit run vis.py
 ```
