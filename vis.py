@@ -124,6 +124,11 @@ if investments:
 total_investment = df_investmentes["Total Value"].sum()
 st.write(f"Total Investment Value: ${total_investment}")
 
-
+# Line chart of selected ticker
+if not df_investmentes.empty:
+    selected_ticker = st.selectbox("Select a ticker to view its performance", df_investmentes["Ticker"].unique())
+    if selected_ticker:
+        ticker_data = yf.Ticker(selected_ticker).history(period="3mo")
+        st.line_chart(ticker_data["Close"])
 
 conn.close()
