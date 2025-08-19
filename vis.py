@@ -45,11 +45,15 @@ def delete_investment(investment_id):
 
 # Function to fetch all investments
 def fetch_investments():
-    cursor = conn.cursor()
-    cursor.execute("SELECT * FROM investments WHERE user_id = ?", (get_user_id(current_user),))
-    investments = cursor.fetchall()
-    cursor.close()
-    return investments
+    username = st.session_state.user
+    query = """
+    SELECT i.*
+    FROM investments i
+    JOIN users u ON i.user_id = u.id
+    WHERE u.name = ?
+    """
+    return pd.read_sql(query, conn, params=(username,))
+
 
 # Fetching the latest stock price using yfinance
 def fetch_latest_price(ticker):
@@ -111,24 +115,65 @@ if 'user' in st.session_state:
                 insert_investment(current_user, ticker, amount, price, str(date))
                 st.success(f"{amount} shares of {ticker} added successfully!")
 
-# Display / Visualize owned stocks
-investments = fetch_investments()
-if investments:
-    df_investmentes = pd.DataFrame(investments, columns=["ID", "User ID", "Ticker", "Amount", "Price", "Date"])
-    # create column to display total value of each stock
-    df_investmentes["Total Value"] = (df_investmentes["Amount"] * df_investmentes["Price"]).round(2)
-    st.write(f"### Investments for {current_user}")
-    st.dataframe(df_investmentes)
 
-# Display total investment value
-total_investment = df_investmentes["Total Value"].sum()
-st.write(f"Total Investment Value: ${total_investment}")
+# Fetch investments if user is logged in and has investments
+if 'user' in st.session_state:
+    # Initialize view mode
+    if "edit_mode" not in st.session_state:
+        st.session_state.edit_mode = False
+    # Toggle button
+    if st.button("Toggle Edit Mode"):
+        st.session_state.edit_mode = not st.session_state.edit_mode
+
+    try:
+        # Fetch user investments
+        investments = fetch_investments()
+        # Create column to display total value of each stock
+        investments["total value"] = (investments["amount"] * investments["price"]).round(2)
+    except Exception as e:
+        print(f"Error fetching investments: {e}")
+
+    # Display depending on mode
+    if st.session_state.edit_mode and not investments.empty:
+        st.write(f"### Edit Investments for {current_user}")
+        for _, row in investments.iterrows():
+            col1, col2, col3, col4, col5 = st.columns([2,2,2,2,1])
+            col1.write(row["id"])
+            col2.write(row["ticker"])
+            col3.write(int(row["amount"]))
+            col4.write(round(row["price"], 2))
+            if col5.button("❌", key=f"del_{row['id']}"):
+                delete_investment(row["id"])
+                st.success(f"Deleted {row['ticker']}")
+                st.rerun()
+    elif not st.session_state.edit_mode and not investments.empty:
+        st.write(f"### {current_user} Investments")
+        # Default view
+        # only keep certain columns
+        investments_subset = investments[["ticker", "amount", "price"]]
+        # rename columns
+        investments_subset = investments_subset.rename(columns={
+            "id": "ID",
+            "ticker": "Ticker",
+            "amount": "Amount",
+            "price": "Price (€)"
+        })
+        # Display investments table
+        st.dataframe(investments_subset)
+        # Display total investment value
+        total_investment = investments["total value"].sum()
+        st.write(f"Total Investment Value: ${total_investment}")
+    else:
+        st.info("No investments yet.")
+
+
+
 
 # Line chart of selected ticker
-if not df_investmentes.empty:
-    selected_ticker = st.selectbox("Select a ticker to view its performance", df_investmentes["Ticker"].unique())
-    if selected_ticker:
-        ticker_data = yf.Ticker(selected_ticker).history(period="3mo")
-        st.line_chart(ticker_data["Close"])
+#if not df_investmentes.empty:
+#    selected_ticker = st.selectbox("Select a ticker to view its performance", df_investmentes["Ticker"].unique())
+#    if selected_ticker:
+#        ticker_data = yf.Ticker(selected_ticker).history(period="3mo")
+#        st.line_chart(ticker_data["Close"])
 
 conn.close()
