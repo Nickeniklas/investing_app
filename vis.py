@@ -151,12 +151,15 @@ if 'user' in st.session_state:
         # Default view
         # only keep certain columns
         investments_subset = investments[["ticker", "amount", "price"]]
+        # Add total value column
+        investments_subset["total value"] = (investments_subset["amount"] * investments_subset["price"]).round(2)
         # rename columns
         investments_subset = investments_subset.rename(columns={
             "id": "ID",
             "ticker": "Ticker",
             "amount": "Amount",
-            "price": "Price (€)"
+            "price": "Price (€)",
+            "total value": "Total Value (€)"
         })
         # Display investments table
         st.dataframe(investments_subset)
