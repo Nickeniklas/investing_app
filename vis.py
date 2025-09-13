@@ -3,71 +3,17 @@ import sqlite3
 import plotly.graph_objects as go
 import pandas as pd
 import yfinance as yf
+from utils_db import (
+    create_user,
+    get_user_id,
+    insert_investment,
+    delete_investment,
+    fetch_investments,
+    fetch_latest_price
+)
 
 # SQLite db connection and table creation
 conn = sqlite3.connect("investing_app.db")
-
-# Function to create user
-def create_user(name):
-    cursor = conn.execute("SELECT id FROM users WHERE name = ?", (name,))
-    user_id = cursor.fetchone()
-    if not user_id:
-        conn.execute("INSERT INTO users (name) VALUES (?)", (name,))
-        conn.commit()
-        st.success(f"User {name} created successfully!")
-    else:
-        st.warning(f"User {name} already exists.")
-
-# Function to get user ID
-def get_user_id(name):
-    cursor = conn.execute("SELECT id FROM users WHERE name = ?", (name,))
-    user_id = cursor.fetchone()
-    cursor.close()
-    if user_id:
-        return user_id[0]
-    else:
-        st.error("User not found")
-        return None
-
-# Function to insert data into the investments table
-def insert_investment(user, ticker, amount, price, date):
-    user_id = get_user_id(user)
-    if user_id:
-        conn.execute("INSERT INTO investments (user_id, ticker, amount, price, date) VALUES (?, ?, ?, ?, ?)", (user_id, ticker, amount, price, date))
-        conn.commit()
-    else:
-        st.error("User not found")
-
-# Function to delete an investment
-def delete_investment(investment_id):
-    conn.execute("DELETE FROM investments WHERE id = ?", (investment_id,))
-    conn.commit()
-
-# Function to fetch all investments
-def fetch_investments():
-    username = st.session_state.user
-    query = """
-    SELECT i.*
-    FROM investments i
-    JOIN users u ON i.user_id = u.id
-    WHERE u.name = ?
-    """
-    return pd.read_sql(query, conn, params=(username,))
-
-
-# Fetching the latest stock price using yfinance
-def fetch_latest_price(ticker):
-        if ticker:
-            try:
-                df = yf.Ticker(ticker).history(period="1d", interval="1d")
-                if df.empty:  # ticker exists but no data
-                    st.error(f"No data found for {ticker}")
-                    return None
-                price = df['Close'].iloc[-1]
-                return price
-            except Exception as e:
-                st.error(f"Error fetching data for {ticker}: {e}")
-                return None
 
 # Streamlit Page setup
 st.set_page_config(page_title="MY INVESTER", page_icon=":bar_chart:", layout="wide")  # page configuration
@@ -83,14 +29,15 @@ if 'user' not in st.session_state:
 
     if name_input:
         # Check if user exists in DB
-        user_id = get_user_id(name_input)
+        user_id = get_user_id(name_input, conn)
         if not user_id:
-            create_user(name_input)
+            create_user(name_input, conn)
             st.success(f"Hello {name_input}! Your account was created.")
         else:
             st.info(f"Welcome back, {name_input}!")
         # Store in session
         st.session_state.user = name_input
+        current_user = name_input
 
 # Logged-in logic
 if 'user' in st.session_state:
@@ -112,7 +59,7 @@ if 'user' in st.session_state:
             #get latest price, else cancel order
             price = fetch_latest_price(ticker)
             if price is not None:            
-                insert_investment(current_user, ticker, amount, price, str(date))
+                insert_investment(current_user, ticker, amount, price, str(date), conn)
                 st.success(f"{amount} shares of {ticker} added successfully!")
 
 
@@ -127,7 +74,7 @@ if 'user' in st.session_state:
 
     try:
         # Fetch user investments
-        investments = fetch_investments()
+        investments = fetch_investments(conn)
         # Create column to display total value of each stock
         investments["total value"] = (investments["amount"] * investments["price"]).round(2)
     except Exception as e:
@@ -143,7 +90,7 @@ if 'user' in st.session_state:
             col3.write(int(row["amount"]))
             col4.write(round(row["price"], 2))
             if col5.button("❌", key=f"del_{row['id']}"):
-                delete_investment(row["id"])
+                delete_investment(row["id"], conn)
                 st.success(f"Deleted {row['ticker']}")
                 st.rerun()
     elif not st.session_state.edit_mode and not investments.empty:
